@@ -1,6 +1,6 @@
 # FREQ Home
 
-Android Home launcher for the Galaxy M31 (SM-M315F/DS), Android 12 / One UI Core 4.1. Version 0.3.0, Android version code 4.
+Android Home launcher for the Galaxy M31 (SM-M315F/DS), Android 12 / One UI Core 4.1. Version 0.3.1, Android version code 5.
 
 ## What changed
 
@@ -50,3 +50,7 @@ This prototype retains the original test signing identity so compatible APKs can
 The GitHub workflow validates and builds each main-branch commit. Without the original FREQ_KEYSTORE_B64 Actions secret it creates a temporary CI key and labels the artifact test-only; that artifact cannot update an existing installation. Publishing compatible automatic releases requires separately configuring the original key as a GitHub Actions secret. No key has been uploaded by this change.
 
 The existing in-app updater checks release checksum, package name, strictly higher version code and the installed signing certificate before invoking Android's installer. Play Protect acceptance on the phone has not been verified.
+
+## Login handoff hotfix (0.3.1)
+
+External login-provider redirects now restart the complete flow at the Home Base root in the browser rather than forwarding a partial WebView transaction. BROWSER SIGN-IN is visible above the workspace. Continue using the workspace in that browser; its session does not authenticate the embedded view. The reported session error is consistent with the previous cross-client handoff, but device-side authentication remains unverified.

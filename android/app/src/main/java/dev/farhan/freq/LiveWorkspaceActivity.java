@@ -40,7 +40,7 @@ public final class LiveWorkspaceActivity extends Activity {
   status=new TextView(this);status.setText("HOME BASE · SIGN IN IF ASKED");status.setTextColor(0xffc5c5ce);status.setTextSize(10);status.setGravity(Gravity.CENTER);bar.addView(status,new LinearLayout.LayoutParams(0,dp(46),1));
   button(bar,"⋮",this::menu);
   LinearLayout shortcuts=new LinearLayout(this);root.addView(shortcuts);
-  button(shortcuts,"GRAPH",()->navigate("graph"));button(shortcuts,"AREA TREE",()->navigate("area"));button(shortcuts,"SETTINGS",()->navigate("Settings"));
+  button(shortcuts,"GRAPH",()->navigate("graph"));button(shortcuts,"AREA TREE",()->navigate("area"));button(shortcuts,"BROWSER SIGN-IN",()->openBrowser(this));
   progress=new ProgressBar(this,null,android.R.attr.progressBarStyleHorizontal);root.addView(progress,new LinearLayout.LayoutParams(-1,dp(2)));
   web=new WebView(this);web.setBackgroundColor(0xff202023);root.addView(web,new LinearLayout.LayoutParams(-1,0,1));
   WebSettings settings=web.getSettings();settings.setJavaScriptEnabled(true);settings.setDomStorageEnabled(true);settings.setAllowFileAccess(false);settings.setAllowContentAccess(false);settings.setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);settings.setJavaScriptCanOpenWindowsAutomatically(false);settings.setSupportMultipleWindows(false);settings.setSafeBrowsingEnabled(true);
@@ -48,11 +48,15 @@ public final class LiveWorkspaceActivity extends Activity {
   web.setWebViewClient(new WebViewClient(){
    @Override public boolean shouldOverrideUrlLoading(WebView view,WebResourceRequest request){
     if(!request.isForMainFrame())return false;
-    Uri uri=request.getUrl();if(isInternal(uri))return false;
+    Uri uri=request.getUrl();
+    // Provider redirects carry a transaction tied to this WebView cookie jar.
+    // Restart at Home Base in the browser; never transfer that partial transaction.
+    if(isAuthProvider(uri)){status.setText("CONTINUE IN BROWSER · FRESH SIGN-IN");openBrowser(LiveWorkspaceActivity.this);return true;}
+    if(isInternal(uri))return false;
     external(uri);return true;
    }
    @Override public void onPageStarted(WebView view,String url,android.graphics.Bitmap icon){handler.removeCallbacks(prepare);attempts=0;failed=false;status.setText(isSite(url)?"HOME BASE · LOADING":"CHATGPT · SIGN IN");}
-   @Override public void onPageFinished(WebView view,String url){CookieManager.getInstance().flush();if(isSite(url)&&!failed){handler.removeCallbacks(prepare);handler.post(prepare);}}
+   @Override public void onPageFinished(WebView view,String url){CookieManager.getInstance().flush();if(isAuthError(url)){status.setText("SESSION INVALID · USE BROWSER SIGN-IN");return;}if(isSite(url)&&!failed){handler.removeCallbacks(prepare);handler.post(prepare);}}
    @Override public void onReceivedError(WebView view,WebResourceRequest request,WebResourceError error){if(request.isForMainFrame())loadFailed();}
    @Override public void onReceivedHttpError(WebView view,WebResourceRequest request,WebResourceResponse response){if(request.isForMainFrame()&&response.getStatusCode()>=400)loadFailed();}
    @Override public boolean onRenderProcessGone(WebView view,RenderProcessGoneDetail detail){web=null;view.destroy();status.setText("LIVE VIEW STOPPED · USE LOCAL OR REOPEN");return true;}
@@ -70,6 +74,8 @@ public final class LiveWorkspaceActivity extends Activity {
  private Button button(LinearLayout parent,String text,Runnable action){Button b=new Button(this);b.setText(text);b.setTextSize(10);b.setTextColor(0xffdfff00);b.setMinHeight(dp(44));b.setMinimumHeight(dp(44));parent.addView(b);b.setOnClickListener(v->action.run());return b;}
  private int dp(int value){return Math.round(value*getResources().getDisplayMetrics().density);}
  static boolean isSite(String url){if(url==null)return false;Uri u=Uri.parse(url);return "https".equals(u.getScheme())&&"farhan-home-base.farhaansadeeq.chatgpt.site".equals(u.getHost())&&u.getUserInfo()==null&&(u.getPort()==-1||u.getPort()==443);}
+ private static boolean isAuthProvider(Uri u){if(!"https".equals(u.getScheme())||u.getUserInfo()!=null)return false;String host=u.getHost();return "accounts.google.com".equals(host)||"appleid.apple.com".equals(host)||"login.microsoftonline.com".equals(host)||"login.live.com".equals(host);}
+ private static boolean isAuthError(String url){if(url==null)return false;Uri u=Uri.parse(url);return "https".equals(u.getScheme())&&"auth.openai.com".equals(u.getHost())&&"/error".equals(u.getPath());}
  private static boolean isInternal(Uri u){if(isSite(u.toString()))return true;if(!"https".equals(u.getScheme())||u.getUserInfo()!=null||(u.getPort()!=-1&&u.getPort()!=443))return false;String h=u.getHost();return "chatgpt.com".equals(h)||"auth.openai.com".equals(h)||"auth0.openai.com".equals(h);}
  private void external(Uri uri){if(!"https".equals(uri.getScheme())&&!"http".equals(uri.getScheme())){Toast.makeText(this,"Open this link in your browser instead.",Toast.LENGTH_SHORT).show();return;}try{startActivity(new Intent(Intent.ACTION_VIEW,uri).addCategory(Intent.CATEGORY_BROWSABLE));}catch(ActivityNotFoundException e){Toast.makeText(this,"No browser available",Toast.LENGTH_SHORT).show();}}
  static void openBrowser(Activity activity){try{activity.startActivity(new Intent(Intent.ACTION_VIEW,Uri.parse(SITE)).addCategory(Intent.CATEGORY_BROWSABLE));}catch(ActivityNotFoundException e){Toast.makeText(activity,"No browser available",Toast.LENGTH_SHORT).show();}}
