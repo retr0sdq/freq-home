@@ -1,0 +1,71 @@
+name: Android build and release
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: freq-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Install and check interface
+        working-directory: web
+        run: |
+          npm ci
+          npm run check
+          npm run build
+      - name: Select build version
+        run: |
+          echo "FREQ_VERSION_CODE=$((1000 + GITHUB_RUN_NUMBER))" >> "$GITHUB_ENV"
+          echo "FREQ_VERSION_NAME=0.3.${GITHUB_RUN_NUMBER}" >> "$GITHUB_ENV"
+      - name: Prepare signing
+        env:
+          FREQ_KEYSTORE_B64: ${{ secrets.FREQ_KEYSTORE_B64 }}
+        run: |
+          if [ -n "$FREQ_KEYSTORE_B64" ] && [ "${{ github.event_name }}" != "pull_request" ]; then
+            printf '%s' "$FREQ_KEYSTORE_B64" | base64 --decode > android/debug.keystore
+            echo "FREQ_CAN_RELEASE=true" >> "$GITHUB_ENV"
+          else
+            keytool -genkeypair -keystore android/debug.keystore -storepass android -keypass android -alias androiddebugkey -dname 'CN=FREQ CI Test' -keyalg RSA -keysize 2048 -validity 2
+            echo "FREQ_CAN_RELEASE=false" >> "$GITHUB_ENV"
+          fi
+      - name: Build signed APK
+        working-directory: android
+        run: bash ./gradlew --no-daemon assembleRelease
+      - name: Package build
+        run: |
+          mkdir -p release
+          cp android/app/build/outputs/apk/release/app-release.apk release/FREQ-Home.apk
+          python3 scripts/release-metadata.py --apk release/FREQ-Home.apk --version-code "$FREQ_VERSION_CODE" --version-name "$FREQ_VERSION_NAME" --repository "$GITHUB_REPOSITORY" --tag "v$FREQ_VERSION_NAME" --output release/update.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: FREQ-Home-${{ env.FREQ_VERSION_NAME }}-${{ env.FREQ_CAN_RELEASE == 'true' && 'update' || 'ci-test-only' }}
+          path: release/
+      - name: Publish update release
+        if: env.FREQ_CAN_RELEASE == 'true' && github.event_name != 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "v$FREQ_VERSION_NAME" release/FREQ-Home.apk release/update.json --target "$GITHUB_SHA" --title "FREQ Home $FREQ_VERSION_NAME" --notes "Automatic build from $GITHUB_SHA. Install over the existing FREQ app to preserve local records."
+      - name: Explain signing setup
+        if: env.FREQ_CAN_RELEASE != 'true'
+        run: |
+          echo '### Test build only — no update published' >> "$GITHUB_STEP_SUMMARY"
+          echo 'Add the original app signing keystore as FREQ_KEYSTORE_B64 in Actions secrets. Until then this workflow validates builds using a temporary CI key; that APK cannot update an existing installation.' >> "$GITHUB_STEP_SUMMARY"

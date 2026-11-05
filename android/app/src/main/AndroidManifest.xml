@@ -1,0 +1,13 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+ <uses-permission android:name="android.permission.INTERNET"/>
+ <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES"/>
+ <queries><intent><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/></intent><intent><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.HOME"/></intent></queries>
+ <application android:label="FREQ Home" android:theme="@style/AppTheme" android:icon="@drawable/freq_icon" android:allowBackup="false" android:usesCleartextTraffic="false" android:supportsRtl="true">
+  <activity android:name=".HomeActivity" android:exported="true" android:launchMode="singleTask" android:excludeFromRecents="true" android:configChanges="orientation|screenSize|keyboardHidden" android:windowSoftInputMode="adjustResize">
+   <intent-filter><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.HOME"/><category android:name="android.intent.category.DEFAULT"/></intent-filter>
+   <intent-filter><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/></intent-filter>
+  </activity>
+  <activity android:name=".LiveWorkspaceActivity" android:exported="false" android:windowSoftInputMode="adjustResize"/>
+  <provider android:name="androidx.core.content.FileProvider" android:authorities="${applicationId}.updates" android:exported="false" android:grantUriPermissions="true"><meta-data android:name="android.support.FILE_PROVIDER_PATHS" android:resource="@xml/update_paths"/></provider>
+ </application>
+</manifest>

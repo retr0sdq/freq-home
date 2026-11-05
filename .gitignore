@@ -1,0 +1,10 @@
+node_modules/
+.gradle/
+**/build/
+local.properties
+*.keystore
+*.jks
+.openai/
+android/app/src/main/assets/ui/
+
+node_modules
